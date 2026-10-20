@@ -174,7 +174,9 @@ class Workspaces : public AModule, public EventHandler {
 
   bool m_withIcon;
   uint64_t m_monitorId;
-  int m_activeWorkspaceId;
+  // init() sets this only when Hyprland answers; until then it is 0, what a failed request used to
+  // set.
+  int m_activeWorkspaceId = 0;
   std::string m_activeSpecialWorkspaceName;
   std::vector<std::unique_ptr<Workspace>> m_workspaces;
   std::vector<std::pair<Json::Value, Json::Value>> m_workspacesToCreate;
