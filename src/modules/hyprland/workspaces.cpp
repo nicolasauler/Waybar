@@ -232,14 +232,23 @@ std::vector<std::string> Workspaces::getVisibleWorkspaces() {
 void Workspaces::initializeWorkspaces() {
   spdlog::debug("Initializing workspaces");
 
+  // get all current workspaces. A failed request reads as null, not as a compositor without
+  // workspaces: keep the ones shown instead of removing them all.
+  auto const workspacesJson = m_ipc.getSocket1JsonReply("workspaces");
+  if (!workspacesJson.isArray()) {
+    spdlog::warn("Hyprland IPC: couldn't read workspaces, keeping the current ones");
+    return;
+  }
+  auto const clientsJson = m_ipc.getSocket1JsonReply("clients");
+  if (!clientsJson.isArray()) {
+    spdlog::warn("Hyprland IPC: couldn't read clients, keeping the current workspaces");
+    return;
+  }
+
   // if the workspace rules changed since last initialization, make sure we reset everything:
   for (auto& workspace : m_workspaces) {
     m_workspacesToRemove.push_back(workspace->address());
   }
-
-  // get all current workspaces
-  auto const workspacesJson = m_ipc.getSocket1JsonReply("workspaces");
-  auto const clientsJson = m_ipc.getSocket1JsonReply("clients");
 
   for (const auto& workspaceJson : workspacesJson) {
     const auto identity = parseWorkspaceIdentity(workspaceJson);
