@@ -376,6 +376,25 @@ void Workspaces::onSpecialWorkspaceActivated(std::string const& payload) {
 void Workspaces::onWorkspaceDestroyed(std::string const& payload) {
   const auto [workspaceId, workspaceName] = splitDoublePayload(payload);
   if (!isDoubleSpecial(workspaceName)) {
+    // Removals are applied before creations, so a creation queued earlier (by createworkspacev2
+    // or a configreloaded snapshot) would bring the workspace back. Config-persistent workspaces
+    // stay, as in removeWorkspace().
+    std::erase_if(m_workspacesToCreate, [&](auto const& queued) {
+      auto const& data = queued.first;
+      if (data["persistent-config"].asBool()) {
+        return false;
+      }
+      // Match the name a created Workspace has (see its constructor): without the prefix.
+      auto const id = data["id"].asInt();
+      auto const rawName = data["name"].asString();
+      std::string_view name = rawName;
+      if (name.starts_with("name:")) {
+        name.remove_prefix(5);
+      } else if (name.starts_with("special:") && id != -99) {
+        name.remove_prefix(8);
+      }
+      return matchesWorkspace(workspaceId, id, name);
+    });
     m_workspacesToRemove.push_back(workspaceId);
   }
 }
@@ -510,6 +529,17 @@ void Workspaces::onWindowClosed(std::string const& addr) {
   spdlog::trace("Window closed: {}", addr);
   updateWindowCount();
   m_orphanWindowMap.erase(addr);
+  // Nor may a closed window come back from the queues.
+  std::erase_if(m_windowsToCreate, [&](auto const& window) { return window.getAddress() == addr; });
+  const auto clientAddress = fmt::format("0x{}", addr);
+  for (auto& [workspaceData, clientsData] : m_workspacesToCreate) {
+    for (Json::ArrayIndex i = 0; i < clientsData.size(); ++i) {
+      if (clientsData[i]["address"].asString() == clientAddress) {
+        clientsData.removeIndex(i, nullptr);
+        break;
+      }
+    }
+  }
   for (auto& workspace : m_workspaces) {
     if (workspace->closeWindow(addr)) {
       break;
@@ -835,29 +865,30 @@ void Workspaces::removeWorkspacesToRemove() {
   m_workspacesToRemove.clear();
 }
 
-void Workspaces::removeWorkspace(std::string const& workspaceString) {
-  spdlog::debug("Removing workspace {}", workspaceString);
-
+bool Workspaces::matchesWorkspace(std::string const& workspaceString, int id,
+                                  std::string_view name) {
   // If this succeeds, we have a workspace ID.
-  const auto workspaceId = parseWorkspaceId(workspaceString);
+  if (const auto workspaceId = parseWorkspaceId(workspaceString); workspaceId.has_value()) {
+    return *workspaceId == id;
+  }
 
-  std::string name;
   // TODO: At some point we want to support all workspace selectors
   // This is just a subset.
   // https://wiki.hyprland.org/Configuring/Workspace-Rules/#workspace-selectors
-  if (workspaceString.starts_with("special:")) {
-    name = workspaceString.substr(8);
-  } else if (workspaceString.starts_with("name:")) {
-    name = workspaceString.substr(5);
-  } else {
-    name = workspaceString;
+  std::string_view selector = workspaceString;
+  if (selector.starts_with("special:")) {
+    selector.remove_prefix(8);
+  } else if (selector.starts_with("name:")) {
+    selector.remove_prefix(5);
   }
+  return selector == name;
+}
+
+void Workspaces::removeWorkspace(std::string const& workspaceString) {
+  spdlog::debug("Removing workspace {}", workspaceString);
 
   const auto workspace = std::ranges::find_if(m_workspaces, [&](std::unique_ptr<Workspace>& x) {
-    if (workspaceId.has_value()) {
-      return *workspaceId == x->id();
-    }
-    return name == x->name();
+    return matchesWorkspace(workspaceString, x->id(), x->name());
   });
 
   if (workspace == m_workspaces.end()) {

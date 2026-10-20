@@ -11,6 +11,7 @@
 #include <optional>
 #include <regex>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "AModule.hpp"
@@ -100,6 +101,8 @@ class Workspaces : public AModule, public EventHandler {
   void onWorkspaceMoved(std::string const& payload);
   void onWorkspaceRenamed(std::string const& payload);
   static std::optional<int> parseWorkspaceId(std::string const& workspaceIdStr);
+  // Whether a workspace selector from a Hyprland event names the workspace with this id and name.
+  static bool matchesWorkspace(std::string const& workspaceString, int id, std::string_view name);
 
   // monitor events
   void onMonitorFocused(std::string const& payload);
