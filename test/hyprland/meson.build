@@ -11,6 +11,7 @@ test_dep = [
 test_src = files(
     '../main.cpp',
     'backend.cpp',
+    'reconnect.cpp',
     '../../src/modules/hyprland/backend.cpp'
 )
 
@@ -25,4 +26,6 @@ test(
     'hyprland',
     hyprland_test,
     workdir: meson.project_source_root(),
+    # A failing refresh waits out several 5 s assertions.
+    timeout: 60,
 )

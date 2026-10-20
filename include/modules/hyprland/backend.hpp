@@ -1,6 +1,8 @@
 #pragma once
 
 #include <atomic>
+#include <chrono>
+#include <condition_variable>
 #include <filesystem>
 #include <list>
 #include <mutex>
@@ -40,11 +42,17 @@ class IPC {
 
  private:
   void socketListener();
+  void readEvents(int socketfd);
+  void closeEventSocket();
+  bool waitBeforeRetry(std::chrono::milliseconds delay);
+  void refreshAfterReconnect();
+  void dispatch(const std::string& ev);
   void parseIPC(const std::string&);
 
   std::thread ipcThread_;
   std::mutex callbackMutex_;
   std::mutex socketMutex_;
+  std::condition_variable stopRequested_;  // wakes a listener waiting to reconnect
   util::JsonParser parser_;
   std::list<std::pair<std::string, EventHandler*>> callbacks_;
   int socketfd_ = -1;  // the hyprland socket file descriptor
