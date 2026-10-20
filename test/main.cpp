@@ -11,9 +11,12 @@
 #include <catch2/catch.hpp>
 #include <catch2/catch_reporter_tap.hpp>
 #endif
+#include <cstdlib>
 #include <memory>
 
 int main(int argc, char* argv[]) {
+  // Never reach the Hyprland of the session the tests run in.
+  unsetenv("HYPRLAND_INSTANCE_SIGNATURE");
   Catch::Session session;
   Glib::init();
 

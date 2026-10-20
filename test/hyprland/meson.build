@@ -13,6 +13,7 @@ test_src = files(
     'backend.cpp',
     'workspace_identity.cpp',
     'workspace_order.cpp',
+    'reconnect.cpp',
     '../../src/modules/hyprland/backend.cpp',
     '../../src/modules/hyprland/workspace_identity.cpp'
 )
@@ -28,4 +29,6 @@ test(
     'hyprland',
     hyprland_test,
     workdir: meson.project_source_root(),
+    # A failing refresh waits out several 5 s assertions.
+    timeout: 60,
 )
