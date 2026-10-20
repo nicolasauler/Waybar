@@ -30,6 +30,15 @@ Workspaces::Workspaces(const std::string& id, const Bar& bar, const Json::Value&
 
   setCurrentMonitorId();
   init();
+
+  // Bound here, on the GTK thread, rather than in init(): Hyprland's configreloaded runs init() on
+  // the IPC thread, and enable-bar-scroll is Waybar's setting, which a Hyprland reload keeps.
+  if (barScroll()) {
+    auto& window = const_cast<Bar&>(m_bar).window;
+    window.add_events(Gdk::SCROLL_MASK | Gdk::SMOOTH_SCROLL_MASK);
+    m_scrollEventConnection_ =
+        window.signal_scroll_event().connect(sigc::mem_fun(*this, &Workspaces::handleScroll));
+  }
   registerIpc();
 }
 
@@ -54,17 +63,6 @@ void Workspaces::init() {
   }
 
   initializeWorkspaces();
-
-  if (m_scrollEventConnection_.connected()) {
-    m_scrollEventConnection_.disconnect();
-  }
-
-  if (barScroll()) {
-    auto& window = const_cast<Bar&>(m_bar).window;
-    window.add_events(Gdk::SCROLL_MASK | Gdk::SMOOTH_SCROLL_MASK);
-    m_scrollEventConnection_ =
-        window.signal_scroll_event().connect(sigc::mem_fun(*this, &Workspaces::handleScroll));
-  }
 
   dp.emit();
 }
